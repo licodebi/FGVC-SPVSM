@@ -77,7 +77,7 @@ def set_environment(args, tlogger):
     set_seed(args.seed)
     model = MODEL_GETTER[args.model_name](
         num_classes=args.num_classes,
-        img_size=args.data_size,
+        img_size=args.img_size,
         update_warm=args.warmup_batchs,
         num_selects=args.num_selects,
         patch_num=args.patch_num,
