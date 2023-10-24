@@ -166,33 +166,15 @@ class Attention(nn.Module):
         # 对注意力权重进行缩放
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if mask is not None:
-            # if debug_mode:
-            #     # 如果随机生成的浮点数小于0.000001，否则被设置为False
-            #     print_info = True if (random.random() < 0.000001) else False
-            #     x = random.random()
-            #     # x是否在区间(0.00005, 0.00007)内，如果是，则print_info设置为True，否则设置为False
-            #     if (x > 0.00005) and (x < 0.00007):
-            #         print_info = True
-            #     else:
-            #         print_info = False
-            # else:
-            #     print_info = False
-            # attention_scores(B,C,S)
-            # max_as大小为(B,C),取到每个头的最大值
-            max_as = torch.max(attention_scores[:, :, 0, :], dim=2, keepdim=False)[0]
-            max_as = max_as.to(device='cuda')
-            mask_626 = torch.zeros(mask.size(0), (mask.size(1) + 1))  # , dtype=torch.float64) # dtype=torch.double)
-            mask_626 = mask_626.to(device='cuda')
-            mask_626[:, 1:] = mask[:, :]
+            max_as = torch.max(attention_scores[:, :, 0, :], dim=2, keepdim=False)[0].to(device='cuda')
+            mask_626 = torch.zeros(mask.size(0), (mask.size(1) + 1), device='cuda')
+            mask_626[:, 1:] = mask
             mask_626[:, 0] = 0
             # positive only, obj + (max * coeff):
-            attention_scores[:, :, 0, :] = \
-                torch.where(mask_626[:, None, :] < 0.5, torch.add(attention_scores[:, :, 0, :],
-                                                                  torch.mul(max_as[:, :, None],
-                                                                            torch.tensor(self.coeff_max).cuda())), \
-                            attention_scores[:, :, 0, :]  # .float()
-                            )
-
+            mask_condition = mask_626[:, None, :] < 0.5
+            attention_scores[:, :, 0, :] = torch.where(mask_condition,
+                                                       attention_scores[:, :, 0, :] + max_as[:, :, None] * torch.tensor(
+                                                           self.coeff_max, device='cuda'), attention_scores[:, :, 0, :])
         attention_scores = self.dropkey(attention_scores,0.1)
         # 将权重转为概率形式
         attention_probs = self.softmax(attention_scores)

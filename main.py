@@ -210,7 +210,7 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
             # 数据传入模型进行向前传播
             # outs=[B,200]
             if args.isU2net:
-                outs = model(datas,masks)
+                outs = model(datas,False,masks)
             else:
                 outs = model(datas)
 

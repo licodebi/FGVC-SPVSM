@@ -28,7 +28,7 @@ def get_loader(args):
 
     if args.dataset == 'dogs':
 
-        if args.sm_vit:
+        if args.isU2net:
             train_transform=transforms.Compose([
                 transforms.Resize((args.img_size, args.img_size), Image.BILINEAR),
 
@@ -86,7 +86,7 @@ def get_loader(args):
 
     elif args.dataset== "CUB":
 
-        if args.sm_vit:
+        if args.isU2net:
             train_transform=transforms.Compose([
                 transforms.Resize((args.img_size, args.img_size),Image.BILINEAR),
 
@@ -132,7 +132,7 @@ def get_loader(args):
 
     elif args.dataset == 'nabirds':
 
-        if args.sm_vit:
+        if args.isU2net:
             train_transform=transforms.Compose([
                 transforms.Resize((args.img_size, args.img_size), Image.BILINEAR),
 
@@ -246,12 +246,12 @@ def get_loader(args):
     test_sampler = SequentialSampler(testset)
     train_loader = DataLoader(trainset,
                               sampler=train_sampler,
-                              batch_size=args.train_batch_size,
+                              batch_size=args.batch_size,
                               num_workers=args.num_workers,
                               pin_memory=True)
     test_loader = DataLoader(testset,
                              sampler=test_sampler,
-                             batch_size=args.eval_batch_size,
+                             batch_size=args.batch_size,
                              num_workers=args.num_workers,
                              pin_memory=True) if testset is not None else None
 
