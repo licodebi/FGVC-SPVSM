@@ -280,12 +280,12 @@ def evaluate(args, model, test_loader):
                     # this_name = "FPN1_layer" + str(i)
                     # _cal_evalute_metric(corrects, total_samples, outs[this_name].mean(1), labels, this_name, scores, score_names)
             for name in outs:
-                # if "struct_outs" in name:
-                #     _cal_evalute_metric(corrects, total_samples, outs[name], labels, name, scores,
-                #                         score_names)
-                # if "assist_outs" in name:
-                #     _cal_evalute_metric(corrects, total_samples, outs[name], labels, name, scores,
-                #                         score_names)
+                if "struct_outs" in name:
+                    _cal_evalute_metric(corrects, total_samples, outs[name], labels, name, scores,
+                                        score_names)
+                if "assist_outs" in name:
+                    _cal_evalute_metric(corrects, total_samples, outs[name], labels, name, scores,
+                                        score_names)
                 if "comb_outs" in name:
                     _cal_evalute_metric(corrects, total_samples, outs[name], labels, name, scores,
                                         score_names)

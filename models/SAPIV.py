@@ -92,7 +92,7 @@ class SAPEncoder(nn.Module):
         self.layer = nn.ModuleList()
         self.layer_num=config.num_layers
         # 前11层
-        for _ in range(config.num_layers):
+        for _ in range(config.num_layers-1):
             layer=Block(config,coeff_max)
             self.layer.append(copy.deepcopy(layer))
         self.clr_layer = Block(config)
@@ -120,8 +120,7 @@ class SAPEncoder(nn.Module):
         B, N, C = hidden_states.shape
         selected_hidden_list=[]
         class_token_list = []
-        for i in range(self.layer_num-1):
-            layer=self.layer[i]
+        for i,layer in enumerate(self.layer):
             hidden_states,weights,contribution=layer(hidden_states, mask)
             # 取9,10,11层
             if i>7:
