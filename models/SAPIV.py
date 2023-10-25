@@ -95,10 +95,10 @@ class SAPEncoder(nn.Module):
         for _ in range(config.num_layers-1):
             layer=Block(config,coeff_max)
             self.layer.append(copy.deepcopy(layer))
-        self.clr_layer = Block(config)
-        self.key_layer = Block(config)
+        self.clr_layer = Block(config,coeff_max)
+        self.key_layer = Block(config,coeff_max)
         # self.stru_atten=Block(config)
-        self.part_layer=Block(config)
+        self.part_layer=Block(config,coeff_max)
         # self.part_layer=self.layer[-1]
 
         self.key_norm = LayerNorm(config.hidden_size, eps=1e-6)
