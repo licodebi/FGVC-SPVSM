@@ -1,13 +1,13 @@
-project_name: FGVC-HERBS
+project_name: FGVC-EX-SOD
 notes: 'no inverse'
-exp_name: basline
+exp_name: spvsmv1-nonoverla
 use_wandb: True
 wandb_entity: libicheng
 train_root: ./CUB200-2011/train/
 val_root: ./CUB200-2011/test/
 data_root: ./CUB200-2011/
 isU2net: True
-coeff_max: 0.25
+coeff_max: 0.3
 #"CUB", "dogs", "nabirds"
 dataset: CUB
 img_size: 448
@@ -17,21 +17,22 @@ model_name: vit-b_16
 seed: 1
 pretrained: ~
 optimizer: SGD
-max_lr: 0.0005
+max_lr: 0.00049
 wdecay: 0.0003
 max_epochs: 80
 warmup_batchs: 1500
 use_amp: True
-use_fpn: True
+isSOD: True
+padding: True
 #fpn_size: 1536
 use_selection: True
 num_classes: 200
-split: 'overlap'
+split: 'non-overlap'
 #num_selects:
 #  layer1: 256
 #  layer2: 128
 #  layer3: 64
-patch_num: 84
+patch_num: 90
 num_selects: 126
 use_combiner: True
 #lambda_b0: 1.375
@@ -40,8 +41,8 @@ use_combiner: True
 #lambda_n: 5.0
 #lambda_c: 1.0
 lambda_b: 0.5
-lambda_a: 0.4
-update_freq: 4
+lambda_a: 0.2
+update_freq: 2
 log_freq: 100
-eval_freq: 10
+eval_freq: 2
 temperature: 64

@@ -3,6 +3,7 @@ import logging
 import torch
 
 from torchvision import transforms, datasets
+from torchvision.transforms import InterpolationMode
 from .dataset import *
 from torch.utils.data import DataLoader, RandomSampler, DistributedSampler, SequentialSampler
 from PIL import Image
@@ -88,7 +89,7 @@ def get_loader(args):
 
         if args.isU2net:
             train_transform=transforms.Compose([
-                transforms.Resize((args.img_size, args.img_size),Image.BILINEAR),
+                transforms.Resize((args.img_size, args.img_size),InterpolationMode.BILINEAR),
 
                 transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
                 #transforms.RandomHorizontalFlip(), # !!! FLIPPING in dataset.py !!!
@@ -98,7 +99,7 @@ def get_loader(args):
                 ])
 
             test_transform=transforms.Compose([
-                transforms.Resize((args.img_size, args.img_size),Image.BILINEAR),
+                transforms.Resize((args.img_size, args.img_size),InterpolationMode.BILINEAR),
 
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])

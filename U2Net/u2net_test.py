@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms#, utils
+from torchvision.transforms import InterpolationMode
 # import torch.optim as optim
 
 import numpy as np
@@ -43,7 +44,7 @@ def save_output(image_name,pred,d_dir):
     im = Image.fromarray(predict_np*255).convert('RGB')
     img_name = image_name.split(os.sep)[-1]
     image = io.imread(image_name)
-    imo = im.resize((image.shape[1],image.shape[0]),resample=Image.BILINEAR)
+    imo = im.resize((image.shape[1],image.shape[0]),resample=InterpolationMode.BILINEAR)
 
     pb_np = np.array(imo)
 
@@ -150,10 +151,14 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
         THRESHOLD_deep = 0.1 # for the non-detected mask
         # 得到预测值的高宽矩阵
         pred = pred[0, :, :]
+        # [320, 320]
+        # print("得到的图片大小:",pred.shape)
 
         pred_cpu = pred.cpu()
+
         # 得到输出的图片
         out_img = pred_cpu.detach().numpy()
+
         out_img_refine = copy.deepcopy(out_img)
 
     
@@ -174,15 +179,15 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
             transforms.ToPILImage(mode='L'), #(mode='1'),
             #transforms.Resize((image.shape[1],image.shape[0]), Image.BILINEAR),
             # 将图像调整为对应大小
-            transforms.Resize((shape_hw_i[0], shape_hw_i[1]), Image.BILINEAR), # shape_hw (0 - height, 1 - width)
+            transforms.Resize((shape_hw_i[0], shape_hw_i[1]), InterpolationMode.BILINEAR), # shape_hw (0 - height, 1 - width)
             # 最后再转成张量
             transforms.ToTensor(),
             ])
         # 将模型得到的图片进行处理
         out_img = transform_mask(out_img)
         #得到图片高宽
+        # [500, 415]
         out_img = out_img[0, :, :]
-
         mask_out = out_img
         mask_out = mask_out.cpu()
         # 对像素进行判断，大于阈值的设为0小于的设为1
@@ -263,7 +268,7 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
                 transforms.ToTensor(),
                 transforms.ToPILImage(mode='L'), #(mode='1'),
                 #transforms.Resize((image.shape[1],image.shape[0]), Image.BILINEAR),
-                transforms.Resize((shape_hw_i[0], shape_hw_i[1]), Image.BILINEAR), # shape_hw (0 - height, 1 - width)
+                transforms.Resize((shape_hw_i[0], shape_hw_i[1]), InterpolationMode.BILINEAR), # shape_hw (0 - height, 1 - width)
                 transforms.ToTensor(),
                 ])
 

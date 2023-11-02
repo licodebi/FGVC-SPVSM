@@ -16,6 +16,7 @@ from eval import evaluate, cal_train_metrics, suppression
 import sys
 import random
 from utils.data_utils import get_loader
+from utils.loader_utils import getloader
 
 sys.setrecursionlimit(10**5)
 warnings.simplefilter("ignore")
@@ -45,6 +46,8 @@ def set_environment(args, tlogger):
     # 读取训练集以及验证集
     if not args.isU2net:
         train_loader, val_loader = build_loader(args)
+    elif args.isSOD:
+        train_loader, val_loader=getloader(args)
     else:
         train_loader, val_loader = get_loader(args)
     # 如果训练集为空或验证集为空
@@ -169,7 +172,7 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
     # for batch_id, (ids, datas, labels) in enumerate(train_loader):
     # 如果使用mask处理
     for batch_id, batch in enumerate(train_loader):
-        if args.isU2net:
+        if args.isSOD:
             datas,labels,masks=batch
         else:
             idx,datas,labels=batch
