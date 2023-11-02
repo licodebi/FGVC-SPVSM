@@ -1,7 +1,6 @@
 from utils.data_utils import get_loader
 import argparse
 import numpy as np
-from InSPyReNet import CUB
 from utils.loader_utils import getloader
 def main():
     parser = argparse.ArgumentParser()

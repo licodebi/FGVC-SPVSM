@@ -74,25 +74,22 @@ def mask(datapath):
                 out = model(sample['image'])
             else:
                  out = model(sample)
-            if i==0:
-                # pred = to_numpy(out['pred'], sample['shape'])
-                pred = out['pred']
-                pred[pred<0.2]=0.
-                pred[pred>=0.2]=1.
-                pred=pred.squeeze()
-                transform_mask = transform.Compose([
-                    transform.ToPILImage(),  # (mode='1'),
-                    transform.Resize((sample['shape'][0], sample['shape'][1]), Image.NEAREST),
-                    transform.ToTensor()
-                ])
-                pred=transform_mask(pred).squeeze()
-                row_indices, col_indices = np.where(pred == 1.)
-                min_row, min_col = min(row_indices), min(col_indices)
-                max_row, max_col = max(row_indices), max(col_indices)
-                bounding_box = (min_row, min_col, max_row, max_col)
-                mask_out_list.append(pred)
-                mask_out_bound.append(bounding_box)
-                # mask_out_name.append(sample['name'])
+            pred = out['pred']
+            pred[pred<0.2]=0.
+            pred[pred>=0.2]=1.
+            pred=pred.squeeze()
+            transform_mask = transform.Compose([
+                transform.ToPILImage(),  # (mode='1'),
+                transform.Resize((sample['shape'][0], sample['shape'][1]), Image.NEAREST),
+                transform.ToTensor()
+            ])
+            pred=transform_mask(pred).squeeze()
+            row_indices, col_indices = np.where(pred == 1.)
+            min_row, min_col = min(row_indices), min(col_indices)
+            max_row, max_col = max(row_indices), max(col_indices)
+            bounding_box = (min_row, min_col, max_row, max_col)
+            mask_out_list.append(pred)
+            mask_out_bound.append(bounding_box)
     return mask_out_list,mask_out_bound
 
 
