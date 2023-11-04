@@ -15,9 +15,177 @@ sys.path.append(repopath)
 
 from .custom_transforms import *
 from InSPyReNet.utils.misc import *
+from skimage import io, transform, color
 
 Image.MAX_IMAGE_PIXELS = None
 
+class RescaleT(object):
+
+	def __init__(self,output_size):
+		assert isinstance(output_size,(int,tuple))
+		self.output_size = output_size
+
+	def __call__(self,sample):
+		imidx, image, label = sample['imidx'], sample['image'],sample['label']
+
+		h, w = image.shape[:2]
+
+		if isinstance(self.output_size,int):
+			if h > w:
+				new_h, new_w = self.output_size*h/w,self.output_size
+			else:
+				new_h, new_w = self.output_size,self.output_size*w/h
+		else:
+			new_h, new_w = self.output_size
+
+		new_h, new_w = int(new_h), int(new_w)
+
+		# # #resize the image to new_h x new_w and convert image from range [0,255] to [0,1]
+		# # img = transform.resize(image,(new_h,new_w),mode='constant')
+		# # lbl = transform.resize(label,(new_h,new_w),mode='constant', order=0, preserve_range=True)
+
+		# img = transform.resize(image,(self.output_size,self.output_size),mode='constant')
+		# lbl = transform.resize(label,(self.output_size,self.output_size),mode='constant', order=0, preserve_range=True)
+		img = transform.resize(image,(self.output_size,self.output_size),mode='constant', anti_aliasing=True, anti_aliasing_sigma=None)
+		lbl = transform.resize(label,(self.output_size,self.output_size),mode='constant', order=0, preserve_range=True, anti_aliasing=True, anti_aliasing_sigma=None)
+
+		return {'imidx':imidx, 'image':img,'label':lbl}
+class ToTensorLab(object):
+	"""Convert ndarrays in sample to Tensors."""
+	def __init__(self,flag=0):
+		self.flag = flag
+
+	def __call__(self, sample):
+
+		imidx, image, label =sample['imidx'], sample['image'], sample['label']
+
+		tmpLbl = np.zeros(label.shape)
+
+		if(np.max(label)<1e-6):
+			label = label
+		else:
+			label = label/np.max(label)
+
+		# change the color space
+		if self.flag == 2: # with rgb and Lab colors
+			tmpImg = np.zeros((image.shape[0],image.shape[1],6))
+			tmpImgt = np.zeros((image.shape[0],image.shape[1],3))
+			if image.shape[2]==1:
+				tmpImgt[:,:,0] = image[:,:,0]
+				tmpImgt[:,:,1] = image[:,:,0]
+				tmpImgt[:,:,2] = image[:,:,0]
+			else:
+				tmpImgt = image
+			tmpImgtl = color.rgb2lab(tmpImgt)
+
+			# nomalize image to range [0,1]
+			tmpImg[:,:,0] = (tmpImgt[:,:,0]-np.min(tmpImgt[:,:,0]))/(np.max(tmpImgt[:,:,0])-np.min(tmpImgt[:,:,0]))
+			tmpImg[:,:,1] = (tmpImgt[:,:,1]-np.min(tmpImgt[:,:,1]))/(np.max(tmpImgt[:,:,1])-np.min(tmpImgt[:,:,1]))
+			tmpImg[:,:,2] = (tmpImgt[:,:,2]-np.min(tmpImgt[:,:,2]))/(np.max(tmpImgt[:,:,2])-np.min(tmpImgt[:,:,2]))
+			tmpImg[:,:,3] = (tmpImgtl[:,:,0]-np.min(tmpImgtl[:,:,0]))/(np.max(tmpImgtl[:,:,0])-np.min(tmpImgtl[:,:,0]))
+			tmpImg[:,:,4] = (tmpImgtl[:,:,1]-np.min(tmpImgtl[:,:,1]))/(np.max(tmpImgtl[:,:,1])-np.min(tmpImgtl[:,:,1]))
+			tmpImg[:,:,5] = (tmpImgtl[:,:,2]-np.min(tmpImgtl[:,:,2]))/(np.max(tmpImgtl[:,:,2])-np.min(tmpImgtl[:,:,2]))
+
+			# tmpImg = tmpImg/(np.max(tmpImg)-np.min(tmpImg))
+
+			tmpImg[:,:,0] = (tmpImg[:,:,0]-np.mean(tmpImg[:,:,0]))/np.std(tmpImg[:,:,0])
+			tmpImg[:,:,1] = (tmpImg[:,:,1]-np.mean(tmpImg[:,:,1]))/np.std(tmpImg[:,:,1])
+			tmpImg[:,:,2] = (tmpImg[:,:,2]-np.mean(tmpImg[:,:,2]))/np.std(tmpImg[:,:,2])
+			tmpImg[:,:,3] = (tmpImg[:,:,3]-np.mean(tmpImg[:,:,3]))/np.std(tmpImg[:,:,3])
+			tmpImg[:,:,4] = (tmpImg[:,:,4]-np.mean(tmpImg[:,:,4]))/np.std(tmpImg[:,:,4])
+			tmpImg[:,:,5] = (tmpImg[:,:,5]-np.mean(tmpImg[:,:,5]))/np.std(tmpImg[:,:,5])
+
+		elif self.flag == 1: #with Lab color
+			tmpImg = np.zeros((image.shape[0],image.shape[1],3))
+
+			if image.shape[2]==1:
+				tmpImg[:,:,0] = image[:,:,0]
+				tmpImg[:,:,1] = image[:,:,0]
+				tmpImg[:,:,2] = image[:,:,0]
+			else:
+				tmpImg = image
+
+			tmpImg = color.rgb2lab(tmpImg)
+
+			# tmpImg = tmpImg/(np.max(tmpImg)-np.min(tmpImg))
+
+			tmpImg[:,:,0] = (tmpImg[:,:,0]-np.min(tmpImg[:,:,0]))/(np.max(tmpImg[:,:,0])-np.min(tmpImg[:,:,0]))
+			tmpImg[:,:,1] = (tmpImg[:,:,1]-np.min(tmpImg[:,:,1]))/(np.max(tmpImg[:,:,1])-np.min(tmpImg[:,:,1]))
+			tmpImg[:,:,2] = (tmpImg[:,:,2]-np.min(tmpImg[:,:,2]))/(np.max(tmpImg[:,:,2])-np.min(tmpImg[:,:,2]))
+
+			tmpImg[:,:,0] = (tmpImg[:,:,0]-np.mean(tmpImg[:,:,0]))/np.std(tmpImg[:,:,0])
+			tmpImg[:,:,1] = (tmpImg[:,:,1]-np.mean(tmpImg[:,:,1]))/np.std(tmpImg[:,:,1])
+			tmpImg[:,:,2] = (tmpImg[:,:,2]-np.mean(tmpImg[:,:,2]))/np.std(tmpImg[:,:,2])
+
+		else: # with rgb color
+			tmpImg = np.zeros((image.shape[0],image.shape[1],3))
+			image = image/np.max(image)
+			if image.shape[2]==1:
+				tmpImg[:,:,0] = (image[:,:,0]-0.485)/0.229
+				tmpImg[:,:,1] = (image[:,:,0]-0.485)/0.229
+				tmpImg[:,:,2] = (image[:,:,0]-0.485)/0.229
+			else:
+				tmpImg[:,:,0] = (image[:,:,0]-0.485)/0.229
+				tmpImg[:,:,1] = (image[:,:,1]-0.456)/0.224
+				tmpImg[:,:,2] = (image[:,:,2]-0.406)/0.225
+
+		tmpLbl[:,:,0] = label[:,:,0]
+
+		tmpImg = tmpImg.transpose((2, 0, 1))
+		tmpLbl = label.transpose((2, 0, 1))
+
+		return {'imidx':torch.from_numpy(imidx), 'image': torch.from_numpy(tmpImg).float(), 'label': torch.from_numpy(tmpLbl)}
+# 自定义数据集类
+class SalObjDataset(Dataset):
+	# 图片路径列表，标签列表，数据预处理函数
+	def __init__(self,img_name_list,lbl_name_list,transform=None):
+		# self.root_dir = root_dir
+		# self.image_name_list = glob.glob(image_dir+'*.png')
+		# self.label_name_list = glob.glob(label_dir+'*.png')
+		self.image_name_list = img_name_list
+		self.label_name_list = lbl_name_list
+		self.transform = transform
+	# 图片数
+	def __len__(self):
+		return len(self.image_name_list)
+	# 用于获取数据集中指定索引位置的样本
+	def __getitem__(self,idx):
+
+		# image = Image.open(self.image_name_list[idx])#io.imread(self.image_name_list[idx])
+		# label = Image.open(self.label_name_list[idx])#io.imread(self.label_name_list[idx])
+		# 根据idx读取对应的图片数据
+		image = io.imread(self.image_name_list[idx])
+		# 得到图片路径
+		imname = self.image_name_list[idx]
+		imidx = np.array([idx])
+		# 如果未提供标签列表
+		if(0==len(self.label_name_list)):
+			#创造一个和图像相同大小的全零数组作为虚拟标签 label_3
+			label_3 = np.zeros(image.shape)
+		else:
+			label_3 = io.imread(self.label_name_list[idx])
+
+		label = np.zeros(label_3.shape[0:2])
+		# 如果是三维数组
+		if(3==len(label_3.shape)):
+			#取其第一个通道作为标签
+			label = label_3[:,:,0]
+		elif(2==len(label_3.shape)):
+			label = label_3
+		# 如果图像是三维的而标签是二维的，就在标签上添加一个额外的通道。
+		# 如果图像和标签都是二维的，就在它们各自上添加一个额外的通道
+		if(3==len(image.shape) and 2==len(label.shape)):
+			label = label[:,:,np.newaxis]
+		elif(2==len(image.shape) and 2==len(label.shape)):
+			image = image[:,:,np.newaxis]
+			label = label[:,:,np.newaxis]
+		# 创建一个字典 sample，包含三个条目：'imidx'、'image' 和 'label'，分别对应索引、图像和标签
+		sample = {'imidx':imidx, 'image':image, 'label':label}
+
+		if self.transform:
+			sample = self.transform(sample)
+
+		return sample
 def get_transform(tfs):
     comp = []
     for key, value in zip(tfs.keys(), tfs.values()):
@@ -139,170 +307,3 @@ class RGB_Dataset(Dataset):
 
     def __len__(self):
         return self.size
-class ImageLoader:
-    def __init__(self, root, tfs):
-        if os.path.isdir(root):
-            self.images = [os.path.join(root, f) for f in os.listdir(root) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
-            self.images = sort(self.images)
-        elif os.path.isfile(root):
-            self.images = [root]
-        self.size = len(self.images)
-        self.transform = get_transform(tfs)
-
-    def __iter__(self):
-        self.index = 0
-        return self
-
-    def __next__(self):
-        if self.index == self.size:
-            raise StopIteration
-        image = Image.open(self.images[self.index]).convert('RGB')
-        shape = image.size[::-1]
-        name = self.images[self.index].split(os.sep)[-1]
-        name = os.path.splitext(name)[0]
-            
-        sample = {'image': image, 'name': name, 'shape': shape, 'original': image}
-        sample = self.transform(sample)
-        sample['image'] = sample['image'].unsqueeze(0)
-        if 'image_resized' in sample.keys():
-            sample['image_resized'] = sample['image_resized'].unsqueeze(0)
-        
-        self.index += 1
-        return sample
-
-    def __len__(self):
-        return self.size
-    
-class VideoLoader:
-    def __init__(self, root, tfs):
-        if os.path.isdir(root):
-            self.videos = [os.path.join(root, f) for f in os.listdir(root) if f.lower().endswith(('.mp4', '.avi', 'mov'))]
-        elif os.path.isfile(root):
-            self.videos = [root]
-        self.size = len(self.videos)
-        self.transform = get_transform(tfs)
-
-    def __iter__(self):
-        self.index = 0
-        self.cap = None
-        self.fps = None
-        return self
-
-    def __next__(self):
-        if self.index == self.size:
-            raise StopIteration
-        
-        if self.cap is None:
-            self.cap = cv2.VideoCapture(self.videos[self.index])
-            self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        ret, frame = self.cap.read()
-        name = self.videos[self.index].split(os.sep)[-1]
-        name = os.path.splitext(name)[0]
-        if ret is False:
-            self.cap.release()
-            self.cap = None
-            sample = {'image': None, 'shape': None, 'name': name, 'original': None}
-            self.index += 1
-        
-        else:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image = Image.fromarray(frame).convert('RGB')
-            shape = image.size[::-1]
-            sample = {'image': image, 'shape': shape, 'name': name, 'original': image}
-            sample = self.transform(sample)
-            sample['image'] = sample['image'].unsqueeze(0)
-            if 'image_resized' in sample.keys():
-                sample['image_resized'] = sample['image_resized'].unsqueeze(0)
-            
-        return sample
-    
-    def __len__(self):
-        return self.size
-    
-
-class WebcamLoader:
-    def __init__(self, ID, tfs):
-        self.ID = int(ID)
-        self.cap = cv2.VideoCapture(self.ID)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        self.transform = get_transform(tfs)
-        self.imgs = []
-        self.imgs.append(self.cap.read()[1])
-        self.thread = Thread(target=self.update, daemon=True)
-        self.thread.start()
-        
-    def update(self):
-        while self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret is True:
-                self.imgs.append(frame)
-            else:
-                break
-        
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if len(self.imgs) > 0:
-            frame = self.imgs[-1]
-        else:
-            frame = np.zeros((480, 640, 3)).astype(np.uint8)
-        if self.thread.is_alive() is False or cv2.waitKey(1) == ord('q'):
-            cv2.destroyAllWindows()
-            raise StopIteration
-        
-        else:
-            image = Image.fromarray(frame).convert('RGB')
-            shape = image.size[::-1]
-            sample = {'image': image, 'shape': shape, 'name': 'webcam', 'original': image}
-            sample = self.transform(sample)
-            sample['image'] = sample['image'].unsqueeze(0)
-            if 'image_resized' in sample.keys():
-                sample['image_resized'] = sample['image_resized'].unsqueeze(0)
-        
-        del self.imgs[:-1]
-        return sample
-
-
-    def __len__(self):
-        return 0
-    
-class RefinementLoader:
-    def __init__(self, image_dir, seg_dir, tfs):
-        self.images = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
-        self.images = sort(self.images)
-        
-        self.segs = [os.path.join(seg_dir, f) for f in os.listdir(seg_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))]
-        self.segs = sort(self.segs)
-            
-        self.size = len(self.images)
-        self.transform = get_transform(tfs)
-
-    def __iter__(self):
-        self.index = 0
-        return self
-
-    def __next__(self):
-        if self.index == self.size:
-            raise StopIteration
-        image = Image.open(self.images[self.index]).convert('RGB')
-        seg = Image.open(self.segs[self.index]).convert('L')
-        shape = image.size[::-1]
-        name = self.images[self.index].split(os.sep)[-1]
-        name = os.path.splitext(name)[0]
-            
-        sample = {'image': image, 'gt': seg, 'name': name, 'shape': shape, 'original': image}
-        sample = self.transform(sample)
-        sample['image'] = sample['image'].unsqueeze(0)
-        sample['mask'] = sample['gt'].unsqueeze(0)
-        if 'image_resized' in sample.keys():
-            sample['image_resized'] = sample['image_resized'].unsqueeze(0)
-        del sample['gt']
-        
-        self.index += 1
-        return sample
-
-    def __len__(self):
-        return self.size
-    

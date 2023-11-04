@@ -25,7 +25,7 @@ from torchvision.transforms import functional as F
 
 import U2Net
 from U2Net.u2net_test import mask_hw
-
+from InSPyReNet.sodmask import new_mask
 from skimage import transform as transform_sk
 import gc
 #
@@ -96,7 +96,7 @@ class Generic_smvit_DS():
         if self.sm_vit:
             if self.full_ds:
                 mask_u2n_list, x_u2n_list, y_u2n_list, h_u2n_list, w_u2n_list = \
-                    mask_hw(full_ds=self.full_ds, img_path=file_list_full, shape_hw=shape_hw_list)
+                    new_mask(full_ds=self.full_ds, img_path=file_list_full, shape_hw=shape_hw_list)
             else: # for debug
                 img_path = os.path.join(self.root, self.base_folder, file_list)
                 img_temp = imageio.imread(img_path)
@@ -291,7 +291,7 @@ class Generic_smvit_DS():
             if self.full_ds:
                 # 若已处理，传入图片路径列表，图片高宽列表
                 mask_u2n_list, x_u2n_list, y_u2n_list, h_u2n_list, w_u2n_list = \
-                    mask_hw(full_ds=self.full_ds, img_path=file_list_full, shape_hw=shape_hw_list)
+                    new_mask(img_path=file_list_full, shape_hw=shape_hw_list)
             else: # for debug
                 img_path = os.path.join(self.root, self.base_folder, file_list)
                 img_temp = imageio.imread(img_path)

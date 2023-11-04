@@ -144,7 +144,10 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
         # normalization
         # 从d1的第一个通道获得预测值，并进行正则化
         pred = d1[:,0,:,:]
+        print(pred)
+        print(pred.shape)
         pred = normPRED(pred)
+        print(pred)
         # 设置遮罩的阈值
         THRESHOLD = 0.8 # 0.5 # 0.8 # 0.5 #0.8 # for the original mask (better not smaller than 0.7 cuz artifacts)
         THRESHOLD_resize = 0.2 # 0.1 # 0.2 # for the resized mask
@@ -246,18 +249,7 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
             if print_info: print("Old x (start, end):", startx, endx)
             if print_info: print("Old y (start, end):", starty, endy)
 
-            # img_dir = ("test/" + str(i_test))
-            # if not os.path.exists(img_dir):
-            #     os.makedirs(img_dir, exist_ok=True)   
-
-            # img_name = ("test/" + str(i_test) + "/1mask_init" + str(i_test) + ".png")
-            # img_temp = transforms.ToTensor()(out_img_refine)
-            # save_image(img_temp, img_name)
-
-            # img_name = ("test/" + str(i_test) + "/2mask_old" + str(i_test) + ".png")
-            # img_temp = transforms.ToTensor()(mask_out_np)
-            # save_image(img_temp, img_name)
-            # 再次对该图片进行掩码操作,如何条件的设为白色,其余为黑色
+            # 再次对该图片进行掩码操作,符合条件的设为白色,其余为黑色
             out_img_refine[out_img_refine > THRESHOLD_deep] = 1
             out_img_refine[out_img_refine <= THRESHOLD_deep] = 0
 
@@ -328,11 +320,6 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
 
                 mask_out_np = np.ones((int(shape_hw_i[0]), int(shape_hw_i[1])))
                 mask_out_np[int(starty):int(endy), int(startx):int(endx)] = 0
-
-                # img_name = ("test/" + str(i_test) + "/4mask_new2_" + str(i_test) + ".png")
-                # img_temp = transforms.ToTensor()(mask_out_np)
-                # save_image(img_temp, img_name)
-
                 bad_mask_count+=1
 
             else:
@@ -340,11 +327,6 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
                 mask_out_refine = mask_out_refine.cpu()
                 mask_out_refine = torch.where( mask_out_refine > THRESHOLD_resize, torch.tensor(0.), 
                                                         torch.tensor(1.))
-
-                # img_name = ("test/" + str(i_test) + "/3mask_new1_" + str(i_test) + ".png")
-                # #mask_tem = transforms.ToTensor()(mask)
-                # save_image(mask_out_refine, img_name)
-
                 mask_out_np = mask_out_refine.detach().numpy()
 
                 refined_mask_count+=1
