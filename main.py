@@ -381,7 +381,8 @@ def main(args, tlogger):
         eval_freq_schedule(args, epoch)
 
         model_to_save = model.module if hasattr(model, "module") else model
-        checkpoint = {"model": model_to_save.state_dict(), "optimizer": optimizer.state_dict(), "epoch":epoch}
+        checkpoint = {"model": model_to_save.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch,
+                      "best_acc": best_acc}
         torch.save(checkpoint, args.save_dir + "backup/last.pt")
         # 如果当前的epoch为十的倍数则
         if epoch == 0 or (epoch + 1) % args.eval_freq == 0:
@@ -401,6 +402,8 @@ def main(args, tlogger):
             if acc > best_acc:
                 best_acc = acc
                 best_eval_name = eval_name
+                checkpoint = {"model": model_to_save.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch,
+                              "best_acc": best_acc}
                 torch.save(checkpoint, args.save_dir + "backup/best.pt")
             if args.use_wandb:
                 wandb.run.summary["best_acc"] = best_acc
