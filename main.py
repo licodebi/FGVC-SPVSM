@@ -46,8 +46,8 @@ def set_environment(args, tlogger):
     # 读取训练集以及验证集
     if not args.isU2net:
         train_loader, val_loader = build_loader(args)
-    elif args.isSOD:
-        train_loader, val_loader=getloader(args)
+    # elif args.isSOD:
+    #     train_loader, val_loader=getloader(args)
     else:
         train_loader, val_loader = get_loader(args)
     # 如果训练集为空或验证集为空
