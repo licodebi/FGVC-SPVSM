@@ -146,7 +146,7 @@ class SAPEncoder(nn.Module):
         # clr,weights=self.clr_encoder(selected_hidden_list,cls_token)
         clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
         # clr, weights,contribution= self.clr_encoder(selected_hidden_list, last_token)
-        sort_idx, _ = self.patch_select(weights,contribution, select_num=84, last=True)
+        sort_idx, _ = self.patch_select(weights,contribution, last=True)
         if not test_mode and self.count >= self.warm_steps:
             layer_count=self.count_patch(sort_idx)
             self.update_layer_select(layer_count)
