@@ -260,7 +260,7 @@ def evaluate(args, model, test_loader):
     with torch.no_grad():
         """ accumulate """
         for batch_id, batch in enumerate(test_loader):
-            if args.isSOD:
+            if args.isU2net:
                 datas, labels,masks=batch
             else:
                 ids, datas, labels=batch
@@ -268,7 +268,7 @@ def evaluate(args, model, test_loader):
             scores = []
             datas = datas.to(args.device)
             # 经过模型得到输出
-            if args.isSOD:
+            if args.isU2net:
                 outs = model(datas,True,masks)
             else:
                 outs = model(datas, True)

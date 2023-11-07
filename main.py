@@ -172,7 +172,7 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
     # for batch_id, (ids, datas, labels) in enumerate(train_loader):
     # 如果使用mask处理
     for batch_id, batch in enumerate(train_loader):
-        if args.isSOD:
+        if args.isU2net:
             datas,labels,masks=batch
         else:
             idx,datas,labels=batch
@@ -212,7 +212,7 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
             """
             # 数据传入模型进行向前传播
             # outs=[B,200]
-            if args.isSOD:
+            if args.isU2net:
                 outs = model(datas,False,masks)
             else:
                 outs = model(datas)
