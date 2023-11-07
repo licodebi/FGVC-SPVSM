@@ -81,9 +81,9 @@ class SPTransformer(nn.Module):
                 self.embeddings.position_embeddings.copy_(np2th(posemb))
                 for bname, block in self.encoder.named_children():
                     for uname, unit in block.named_children():
-                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru'):
-                            # print(uname)
-                            unit.load_from(weights, n_block=uname)
+                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru') and not uname.startswith('part'):
+                            print(uname)
+                            # unit.load_from(weights, n_block=uname)
 class SAPEncoder(nn.Module):
     def __init__(self,config,update_warm,patch_num,total_num,split,coeff_max):
         super(SAPEncoder, self).__init__()
@@ -106,14 +106,14 @@ class SAPEncoder(nn.Module):
         self.clr_norm = LayerNorm(config.hidden_size, eps=1e-6)
 
         self.patch_select=MultiHeadSelector(config.hidden_size,self.patch_num)
-        self.part_attention=Part_Attention()
+        # self.part_attention=Part_Attention()
         # 总共选择层的大小一般为126，得到后三层每层选择的大小
         self.total_num=total_num
         self.select_num=torch.tensor([42, 42, 42], device='cuda')
         self.select_rate = self.select_num/ torch.sum(self.select_num)
         self.select_num = self.select_rate * self.total_num
         self.clr_encoder = CrossLayerRefinement(config, self.clr_layer)
-        self.part_structure = Part_Structure(config.hidden_size)
+        # self.part_structure = Part_Structure(config.hidden_size)
         self.count = 0
 
     def forward(self,hidden_states, test_mode=False, mask=None):
@@ -451,27 +451,27 @@ if __name__ == '__main__':
     config = get_b16_config()
     # com = clrEncoder(config,)
     # com.to(device='cuda')
-    # net = SPTransformer(config,200,448,500,84,129,split='non-overlap').cuda()
+    net = SPTransformer(config,200,448,500,84,129,split='non-overlap').cuda()
     # hidden_state = torch.arange(400*768).reshape(2,200,768)/1.0
-    # x = torch.rand(2, 3, 448, 448, device='cuda')
-    batch_size = 2
-    num_channels = 3
-    num_elements = 4
-    score = torch.rand((batch_size, num_channels, num_elements))
-    _, select_indices = torch.topk(score, 2, dim=-1)
-    # print(select.shape)
-    select = torch.zeros_like(score, dtype=torch.bool)
-    select.scatter_(-1, select_indices, True)
-    scaling_factor = 0.0
-
-    # 创建一个与 score 相同形状的全零张量
-    result = torch.zeros_like(score)
-
-    # 使用布尔索引将 select 中的位置对应的值保持不变
-    result[select] = score[select]
-
-    # 使用布尔索引将不在 select 中的值缩小为原来的一半
-    result[~select] = score[~select] * scaling_factor
+    x = torch.rand(2, 3, 448, 448, device='cuda')
+    # batch_size = 2
+    # num_channels = 3
+    # num_elements = 4
+    # score = torch.rand((batch_size, num_channels, num_elements))
+    # _, select_indices = torch.topk(score, 2, dim=-1)
+    # # print(select.shape)
+    # select = torch.zeros_like(score, dtype=torch.bool)
+    # select.scatter_(-1, select_indices, True)
+    # scaling_factor = 0.0
+    #
+    # # 创建一个与 score 相同形状的全零张量
+    # result = torch.zeros_like(score)
+    #
+    # # 使用布尔索引将 select 中的位置对应的值保持不变
+    # result[select] = score[select]
+    #
+    # # 使用布尔索引将不在 select 中的值缩小为原来的一半
+    # result[~select] = score[~select] * scaling_factor
 
     # 打印结果
     # print("Original Score:")
@@ -485,10 +485,10 @@ if __name__ == '__main__':
     # print(y.shape)
     # y = net(x)
     # print(y.keys())
-    # for name, param in net.state_dict().items():
-    #     print(name)
-    # pretrained_weights = np.load('ViT-B_16.npz')
-    # net.load_from(pretrained_weights)
+    for name, param in net.state_dict().items():
+        print(name)
+    pretrained_weights = np.load('./ViT-B_16.npz')
+    net.load_from(pretrained_weights)
 
     # for name, param in pretrained_weights.items():
     #     print(name)
