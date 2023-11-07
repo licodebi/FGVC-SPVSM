@@ -32,7 +32,7 @@ split: 'non-overlap'
 #  layer1: 256
 #  layer2: 128
 #  layer3: 64
-patch_num: 90
+patch_num: 100
 num_selects: 126
 use_combiner: True
 #lambda_b0: 1.375

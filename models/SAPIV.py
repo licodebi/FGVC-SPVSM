@@ -103,7 +103,9 @@ class SAPEncoder(nn.Module):
 
         self.key_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.part_norm = LayerNorm(config.hidden_size, eps=1e-6)
-        self.patch_select=MultiHeadSelector(self.patch_num)
+        self.clr_norm = LayerNorm(config.hidden_size, eps=1e-6)
+
+        self.patch_select=MultiHeadSelector(config.hidden_size,self.patch_num)
         self.part_attention=Part_Attention()
         # 总共选择层的大小一般为126，得到后三层每层选择的大小
         self.total_num=total_num
@@ -126,34 +128,30 @@ class SAPEncoder(nn.Module):
             if i>7:
                 j=i-8
                 select_num = torch.round(self.select_num[j]).int()
-                select_idx, select_score = self.patch_select(weights,contribution,select_num)
+                hidden_states, selected_hidden,select_idx = self.patch_select(hidden_states,weights,contribution,select_num)
                 # select_idx, select_score=self.patch_select(select_weights,select_num)
                 # selected_hidden = select_hidden_states[torch.arange(B).unsqueeze(1),select_idx]
-                selected_hidden = hidden_states[torch.arange(B).unsqueeze(1), select_idx]
                 selected_hidden_list.append(selected_hidden)
-                _,attention_map=self.part_attention(weights)
-                # 此时的cls_token具有结构信息
-                hidden_states=self.part_structure(hidden_states,attention_map)
-                # select_hidden_states,select_weights=self.stru_atten(hidden_states)
                 class_token_list.append(self.part_norm(hidden_states[:,0]))
         # last_token=hidden_states[:, 0].unsqueeze(1)
-        stru_states, stru_weights,_=self.part_layer(hidden_states)
-        _,attention_map=self.part_attention(stru_weights)
-        stru_states= self.part_structure(stru_states,attention_map)
-        cls_token=stru_states[:,0].unsqueeze(1)
-        class_token_list.append(self.part_norm(stru_states)[:,0])
-        # select_hidden_states, select_weights = self.stru_atten(part_states)
-        # clr,weights=self.clr_encoder(selected_hidden_list,cls_token)
+        # stru_states, stru_weights,_=self.part_layer(hidden_states)
+        # _,attention_map=self.part_attention(stru_weights)
+        # stru_states= self.part_structure(stru_states,attention_map)
+        # cls_token=stru_states[:,0].unsqueeze(1)
+        # class_token_list.append(self.part_norm(stru_states)[:,0])
+        cls_token=hidden_states[:,0]
         clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
         # clr, weights,contribution= self.clr_encoder(selected_hidden_list, last_token)
-        sort_idx, _ = self.patch_select(weights,contribution, select_num=84, last=True)
+        hidden_states, selected_hidden,sort_idx= self.patch_select(clr,weights,contribution, last=True)
+        class_token_list.append(self.part_norm(hidden_states[:, 0]))
         if not test_mode and self.count >= self.warm_steps:
             layer_count=self.count_patch(sort_idx)
             self.update_layer_select(layer_count)
-        out=clr[torch.arange(B).unsqueeze(1),sort_idx]
-        out = torch.cat((cls_token, out), dim=1)
+        # out=clr[torch.arange(B).unsqueeze(1),sort_idx]
+        out = torch.cat((cls_token, selected_hidden), dim=1)
         out,_,_ = self.key_layer(out)
         key = self.key_norm(out)
+        clr= self.clr_norm(clr)
         return key[:, 0], clr[:, 0],class_token_list
     def count_patch(self, sort_idx):
         # layer_count 将输出 [16, 30, 42, 52, 60, 66, 74, 84, 96, 110, 126]
@@ -181,7 +179,7 @@ class SAPEncoder(nn.Module):
         self.select_num = self.select_rate * self.total_num
 # 多头选择器以及部分注意特征图
 class MultiHeadSelector(nn.Module):
-    def __init__(self, patch_num=84):
+    def __init__(self, hidden_size,patch_num=84):
         super(MultiHeadSelector, self).__init__()
         # 得到每个头的需要的patch数
         self.patch_num = patch_num
@@ -190,22 +188,38 @@ class MultiHeadSelector(nn.Module):
                                     [2, 4, 2],
                                     [1, 2, 1]], device='cuda').unsqueeze(0).unsqueeze(0).half()
         self.conv = F.conv2d
+        self.part_structure = Part_Structure(hidden_size)
     # 得到的权重的值为(B,Head,S+1,S+1)
-    def forward(self, x,contribution,select_num=None, last=False):
+    def forward(self,hidden_states,x,contribution,select_num=None, last=False):
         # 得到B、头数、patch大小
         B,C,S = x.shape[0],x.shape[1],x.shape[3] - 1
         select_num = self.patch_num if select_num is None else select_num
         count = torch.zeros((B, S), dtype=torch.int, device='cuda').half()
-        row_score = x[:, :, 0,:]
+        score=x[:, :, 0,1:]
+        # row_score = x[:, :, 0,:]
         # col_score=contribution[:,:,:]
-        score=(row_score*contribution)[:, :, 1:]
+        # score=(row_score*contribution)[:, :, 1:]
         # select的形状为[2, 12, select_num] [2, 12, 84]
-        _, select = torch.topk(score, self.patch_num, dim=-1)
-        select = select.reshape(B, -1)
-        new_score=torch.sum(score,dim=1)
-        # print("new_score形状:",new_score.shape)
-        # print("选择的索引的形状:",select.shape)
-        for i, b in enumerate(select):
+        _, select_indices = torch.topk(score, self.patch_num, dim=-1)
+        # 局部增强
+        select = torch.zeros_like(score, dtype=torch.bool)
+        select.scatter_(-1, select_indices, True)
+        scaling_factor = 0.7
+        # 创建一个与 score 相同形状的全零张量
+        new_score = torch.zeros_like(score)
+        # 使用布尔索引将 select 中的位置对应的值保持不变
+        new_score[select] = score[select]
+        # 使用布尔索引将不在 select 中的值缩小为原来的一半
+        new_score[~select] = score[~select] * scaling_factor
+        # 结构信息增强
+        H = S ** 0.5
+        H = int(H)
+        attention_map = new_score.view(B, C, H, H)
+        hidden_states=self.part_structure(hidden_states,attention_map)
+
+        select_indices = select_indices.reshape(B, -1)
+        # new_score=torch.sum(score,dim=1)
+        for i, b in enumerate(select_indices):
             count[i, :] += torch.bincount(b, minlength=S)
         # print("count的形状",count.shape)
         # 如果last不为真
@@ -216,8 +230,9 @@ class MultiHeadSelector(nn.Module):
         patch_value, patch_idx = torch.sort(count, dim=-1, descending=True)
         # 所有索引+1，从0开始变为从1开始
         patch_idx += 1
+        selected_hidden = hidden_states[torch.arange(B).unsqueeze(1), patch_idx]
         # 取前select_num个索引，
-        return patch_idx[:, :select_num], count
+        return hidden_states, selected_hidden,patch_idx
 
     def enhace_local(self, count):
         # 得到B和H
@@ -436,13 +451,39 @@ if __name__ == '__main__':
     config = get_b16_config()
     # com = clrEncoder(config,)
     # com.to(device='cuda')
-    net = SPTransformer(config,200,448,500,84,129,split='non-overlap').cuda()
+    # net = SPTransformer(config,200,448,500,84,129,split='non-overlap').cuda()
     # hidden_state = torch.arange(400*768).reshape(2,200,768)/1.0
-    x = torch.rand(2, 3, 448, 448, device='cuda')
+    # x = torch.rand(2, 3, 448, 448, device='cuda')
+    batch_size = 2
+    num_channels = 3
+    num_elements = 4
+    score = torch.rand((batch_size, num_channels, num_elements))
+    _, select_indices = torch.topk(score, 2, dim=-1)
+    # print(select.shape)
+    select = torch.zeros_like(score, dtype=torch.bool)
+    select.scatter_(-1, select_indices, True)
+    scaling_factor = 0.0
+
+    # 创建一个与 score 相同形状的全零张量
+    result = torch.zeros_like(score)
+
+    # 使用布尔索引将 select 中的位置对应的值保持不变
+    result[select] = score[select]
+
+    # 使用布尔索引将不在 select 中的值缩小为原来的一半
+    result[~select] = score[~select] * scaling_factor
+
+    # 打印结果
+    # print("Original Score:")
+    # print(score)
+    # print("\nSelect Mask:")
+    # print(select)
+    # print("\nResult Score:")
+    # print(result)
     # print(x[:, :, 0, :].shape)
     # y=torch.max(x[:, :, 0, :], dim=2, keepdim=False)[0]
     # print(y.shape)
-    y = net(x)
+    # y = net(x)
     # print(y.keys())
     # for name, param in net.state_dict().items():
     #     print(name)
