@@ -196,16 +196,21 @@ class MultiHeadSelector(nn.Module):
         B,C,S = x.shape[0],x.shape[1],x.shape[3] - 1
         select_num = self.patch_num if select_num is None else select_num
         count = torch.zeros((B, S), dtype=torch.int, device='cuda').half()
-        row_score = x[:, :, 0,:]
-        # col_score=contribution[:,:,:]
-        score=(row_score*contribution)[:, :, 1:]
+        row_score = x[:, :, 0,1:]
+        col_score=contribution[:,:,1:]
+        # score=(row_score*contribution)[:, :, 1:]
         # select的形状为[2, 12, select_num] [2, 12, 84]
-        _, select = torch.topk(score, self.patch_num, dim=-1)
-        select = select.reshape(B, -1)
-        new_score=torch.sum(score,dim=1)
+        _, row_select = torch.topk(row_score, self.patch_num, dim=-1)
+        _, col_select = torch.topk(col_score, self.patch_num, dim=-1)
+        row_select = row_select.reshape(B, -1)
+        col_select = col_select.reshape(B, -1)
+
+        # new_score=torch.sum(score,dim=1)
         # print("new_score形状:",new_score.shape)
         # print("选择的索引的形状:",select.shape)
-        for i, b in enumerate(select):
+        for i, b in enumerate(row_select):
+            count[i, :] += torch.bincount(b, minlength=S)
+        for i, b in enumerate(col_select):
             count[i, :] += torch.bincount(b, minlength=S)
         # print("count的形状",count.shape)
         # 如果last不为真
