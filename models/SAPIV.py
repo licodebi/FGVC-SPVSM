@@ -139,9 +139,11 @@ class SAPEncoder(nn.Module):
         # stru_states= self.part_structure(stru_states,attention_map)
         # cls_token=stru_states[:,0].unsqueeze(1)
         # class_token_list.append(self.part_norm(stru_states)[:,0])
-        cls_token=hidden_states[:,0]
+        cls_token=hidden_states[:,0].unsqueeze(1)
         clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
         # clr, weights,contribution= self.clr_encoder(selected_hidden_list, last_token)
+        print(clr.shape)
+        print(weights.shape)
         hidden_states, selected_hidden,sort_idx= self.patch_select(clr,weights,contribution, last=True)
         class_token_list.append(self.part_norm(hidden_states[:, 0]))
         if not test_mode and self.count >= self.warm_steps:
@@ -230,6 +232,7 @@ class MultiHeadSelector(nn.Module):
         patch_value, patch_idx = torch.sort(count, dim=-1, descending=True)
         # 所有索引+1，从0开始变为从1开始
         patch_idx += 1
+        patch_idx=patch_idx[:, :select_num]
         selected_hidden = hidden_states[torch.arange(B).unsqueeze(1), patch_idx]
         # 取前select_num个索引，
         return hidden_states, selected_hidden,patch_idx
@@ -253,8 +256,10 @@ class CrossLayerRefinement(nn.Module):
 
     def forward(self, x, cls):
         out = torch.cat(x, dim=1)
+        print(out.shape)
         # B,total_num+1,hidden_size
         out = torch.cat((cls, out), dim=1)
+        print(out.shape)
         # 得到out(B,total_num+1,hidden_size)
         # weights (B,Head,total_num+1,total_num+1)
         out, weights,contribution = self.clr_layer(out)
@@ -451,7 +456,7 @@ if __name__ == '__main__':
     config = get_b16_config()
     # com = clrEncoder(config,)
     # com.to(device='cuda')
-    net = SPTransformer(config,200,448,500,84,129,split='non-overlap').cuda()
+    net = SPTransformer(config,200,448,500,84,144,split='non-overlap').cuda()
     # hidden_state = torch.arange(400*768).reshape(2,200,768)/1.0
     x = torch.rand(2, 3, 448, 448, device='cuda')
     # batch_size = 2
@@ -483,12 +488,12 @@ if __name__ == '__main__':
     # print(x[:, :, 0, :].shape)
     # y=torch.max(x[:, :, 0, :], dim=2, keepdim=False)[0]
     # print(y.shape)
-    # y = net(x)
+    y = net(x)
     # print(y.keys())
-    for name, param in net.state_dict().items():
-        print(name)
-    pretrained_weights = np.load('./ViT-B_16.npz')
-    net.load_from(pretrained_weights)
+    # for name, param in net.state_dict().items():
+    #     print(name)
+    # pretrained_weights = np.load('./ViT-B_16.npz')
+    # net.load_from(pretrained_weights)
 
     # for name, param in pretrained_weights.items():
     #     print(name)
