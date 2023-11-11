@@ -315,8 +315,6 @@ class RelativeCoordPredictor(nn.Module):
         binary_mask = binary_mask.view(N, H, H)
         # 将输入张量x与二进制掩码张量binary_mask相乘，
         # 得到一个掩码后的张量masked_x，形状为(N, C, H*W)
-        print(x.shape)
-        print(binary_mask.shape)
         masked_x = x * binary_mask.view(N, 1, H, H)
         # 将masked_x进行维度转置操作，形状变为(N, H*W, C) H*W=S
         masked_x = masked_x.view(N, C, H * H).transpose(1, 2).contiguous()  # (N, S, C)

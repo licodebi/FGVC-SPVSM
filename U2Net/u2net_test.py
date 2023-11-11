@@ -144,10 +144,7 @@ def mask_hw(full_ds=True, img_path=None, shape_hw=None):
         # normalization
         # 从d1的第一个通道获得预测值，并进行正则化
         pred = d1[:,0,:,:]
-        print(pred)
-        print(pred.shape)
         pred = normPRED(pred)
-        print(pred)
         # 设置遮罩的阈值
         THRESHOLD = 0.8 # 0.5 # 0.8 # 0.5 #0.8 # for the original mask (better not smaller than 0.7 cuz artifacts)
         THRESHOLD_resize = 0.2 # 0.1 # 0.2 # for the resized mask

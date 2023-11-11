@@ -733,7 +733,6 @@ class Generic_smvit_DS():
                 transforms.ToTensor()])
 
         mask = transform_mask(mask)
-        print(mask[0])
         if self.debug and index < 10:
             img_name = ("test/mask_aft" + str(index) + ".png")
             save_image(mask, img_name)

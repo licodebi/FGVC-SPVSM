@@ -1,6 +1,6 @@
 project_name: FGVC-EX-SOD
 notes: 'no inverse'
-exp_name: spvsmv1-nonoverla
+exp_name: spvsmv1-nonoverlap
 use_wandb: True
 wandb_entity: libicheng
 train_root: ./CUB200-2011/train/
@@ -12,7 +12,7 @@ coeff_max: 0.3
 dataset: CUB
 img_size: 448
 num_workers: 2
-batch_size: 4
+batch_size: 16
 model_name: vit-b_16
 seed: 1
 pretrained: ~

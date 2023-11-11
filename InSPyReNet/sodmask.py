@@ -135,7 +135,6 @@ def new_mask(img_path,shape_hw):
             out = model(sample)
             # torch.Size([1, 1, 384, 384])
         pred = out['pred']
-        print(pred.shape)
         pred=pred[:,0,:,:]
         pred = normPRED(pred)
         # 设置遮罩的阈值
