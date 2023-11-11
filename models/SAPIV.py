@@ -81,7 +81,7 @@ class SPTransformer(nn.Module):
                 self.embeddings.position_embeddings.copy_(np2th(posemb))
                 for bname, block in self.encoder.named_children():
                     for uname, unit in block.named_children():
-                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru'):
+                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru') and not uname.startswith('part'):
                             # print(uname)
                             unit.load_from(weights, n_block=uname)
 class SAPEncoder(nn.Module):
