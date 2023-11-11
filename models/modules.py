@@ -171,7 +171,7 @@ class Attention(nn.Module):
             mask_626[:, 1:] = mask
             mask_626[:, 0] = 0
             # positive only, obj + (max * coeff):
-            mask_condition = mask_626[:, None, :] >= 0.5
+            mask_condition = mask_626[:, None, :] < 0.5
             attention_scores[:, :, 0, :] = torch.where(mask_condition,
                                                        attention_scores[:, :, 0, :] + max_as[:, :, None] * torch.tensor(
                                                            self.coeff_max, device='cuda'), attention_scores[:, :, 0, :])
