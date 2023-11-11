@@ -81,7 +81,8 @@ class SPTransformer(nn.Module):
                 self.embeddings.position_embeddings.copy_(np2th(posemb))
                 for bname, block in self.encoder.named_children():
                     for uname, unit in block.named_children():
-                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru') and not uname.startswith('part'):
+                        if not bname.startswith('key') and not bname.startswith('clr') and not bname.startswith('part') and not bname.startswith('stru') and  \
+                                not uname.startswith('conv') and not uname.startswith('relative') and not uname.startswith('gcn'):
                             # print(uname)
                             unit.load_from(weights, n_block=uname)
 class SAPEncoder(nn.Module):
@@ -458,12 +459,12 @@ if __name__ == '__main__':
     # print(x[:, :, 0, :].shape)
     # y=torch.max(x[:, :, 0, :], dim=2, keepdim=False)[0]
     # print(y.shape)
-    y = net(x)
+    # y = net(x)
     # print(y.keys())
-    # for name, param in net.state_dict().items():
-    #     print(name)
-    # pretrained_weights = np.load('ViT-B_16.npz')
-    # net.load_from(pretrained_weights)
+    for name, param in net.state_dict().items():
+        print(name)
+    pretrained_weights = np.load('ViT-B_16.npz')
+    net.load_from(pretrained_weights)
 
     # for name, param in pretrained_weights.items():
     #     print(name)
