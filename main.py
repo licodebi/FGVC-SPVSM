@@ -22,10 +22,10 @@ sys.setrecursionlimit(10**5)
 warnings.simplefilter("ignore")
 
 # 设置随机种子
-def set_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+# def set_seed(seed):
+#     random.seed(seed)
+#     np.random.seed(seed)
+#     torch.manual_seed(seed)
 def eval_freq_schedule(args, epoch: int):
     if epoch >= args.max_epochs * 0.95:
         args.eval_freq = 1
@@ -77,7 +77,7 @@ def set_environment(args, tlogger):
     #     num_selects = args.num_selects,
     #     use_combiner = args.use_combiner,
     # ) # about return_nodes, we use our default setting
-    set_seed(args.seed)
+    # set_seed(args.seed)
     model = MODEL_GETTER[args.model_name](
         num_classes=args.num_classes,
         img_size=args.img_size,
