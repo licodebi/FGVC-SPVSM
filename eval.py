@@ -52,8 +52,10 @@ def cal_train_metrics(args, msg: dict, outs: dict, labels: torch.Tensor, batch_s
             acc = top_k_corrects(outs[name], labels, tops=[1])["top-1"] / batch_size
             msg["train_acc/comb_outs_acc"] = acc
             loss_co = nn.CrossEntropyLoss()(outs[name], labels)
-            msg["train_loss/comb_outs_loss"] = loss_co
-            loss_pi += (1 - args.lambda_a) * loss_co
+            msg["train_loss/comb_outs_loss"] = 4.0 * loss_co
+            # msg["train_loss/comb_outs_loss"] = loss_co
+            loss_pi += 4.0 * loss_co
+            # loss_pi += (1 - args.lambda_a) * loss_co
     # 如果使用了fpn
     # if args.use_fpn:
         # for i in range(1, 4):

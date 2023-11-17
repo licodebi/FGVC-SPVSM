@@ -146,8 +146,8 @@ class SAPEncoder(nn.Module):
         clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
         stru_states, stru_weights,_=self.part_layer(hidden_states)
         # _,attention_map=self.part_attention(stru_weights)
-        stru_weights=stru_weights[:,:,0,1:]
-        stru_states= self.part_structure(stru_states,stru_weights)
+        attention_map=stru_weights[:,:,0,1:]
+        stru_states= self.part_structure(stru_states,attention_map,stru_weights)
         # cls_token=stru_states[:,0].unsqueeze(1)
         class_token_list.append(self.part_norm(stru_states)[:,0])
         # select_hidden_states, select_weights = self.stru_atten(part_states)
@@ -200,7 +200,7 @@ class MultiHeadSelector(nn.Module):
         #                             [1, 2, 1]], device='cuda').unsqueeze(0).unsqueeze(0).half()
         self.conv = nn.Conv2d(1, 1, 3, 1, 1).half()
         self.relative = RelativeCoordPredictor()
-        self.gcn =  GCN(2, 512, hidden_size, dropout=0.1)
+        self.gcn =  GCN(12, 512, hidden_size, dropout=0.1)
     # 得到的权重的值为(B,Head,S+1,S+1)
     def forward(self,hidden_states, x,contribution,select_num=None, last=False):
         # 得到B、头数、patch大小
@@ -214,11 +214,13 @@ class MultiHeadSelector(nn.Module):
         score=(row_score*contribution)[:, :, 1:]
         # 得到结构信息
         if not last:
-            structure_info, basic_anchor, position_weight=self.relative(score)
+            structure_info, basic_index=self.relative(score)
+            position_weight = x[:, :, 1:, 1:]
+            position_weight = torch.mean(position_weight, dim=1)
             structure_info = self.gcn(structure_info, position_weight)
             hidden_states_clone = hidden_states.clone()
             for i in range(B):
-                index = int(basic_anchor[i, 0] * H + basic_anchor[i, 1])
+                index = int(basic_index[i])
                 hidden_states_clone[i, 0] = hidden_states_clone[i, 0] + structure_info[i, index, :]
             hidden_states = hidden_states_clone
 
@@ -267,13 +269,13 @@ class Part_Structure(nn.Module):
         # 相对坐标信息
         self.relative_coord_predictor = RelativeCoordPredictor()
         # 设置GCN
-        self.gcn =  GCN(2, 512, hidden_size, dropout=0.1)
+        self.gcn =  GCN(12, 512, hidden_size, dropout=0.1)
 
     # 输入hidden_states制计即该层的输出(B, S, head_size)
     # 最大值索引(batch_size, num_attention_heads, 1)
     # 注意力特征图(B,C,H,H)C=注意力头数
     # struc_tokens (B,1,hidden_size)
-    def forward(self, hidden_states, attention_map):
+    def forward(self, hidden_states, attention_map,weight):
         # 注意力特征图的形状信息
         # C=注意力头数
         B,C,S = attention_map.shape
@@ -284,13 +286,15 @@ class Part_Structure(nn.Module):
         # 基础锚点(N,2)
         # 位置权重 (N,S,S)
         # 具有最大均值值像素的索引(N,)
-        structure_info, basic_anchor, position_weight = self.relative_coord_predictor(attention_map)
+        position_weight = weight[:, :, 1:, 1:]
+        position_weight = torch.mean(position_weight, dim=1)
+        structure_info, basic_index = self.relative_coord_predictor(attention_map)
         # structure_info为(N,S,512)
         structure_info = self.gcn(structure_info, position_weight)
         hidden_states_clone=hidden_states.clone()
         for i in range(B):
-            index = int(basic_anchor[i,0]*H + basic_anchor[i,1])
-            hidden_states_clone[i,0] = hidden_states_clone[i,0] + structure_info[i, index, :]
+            index = int(basic_index[i])
+            hidden_states_clone[i, 0] = hidden_states_clone[i, 0] + structure_info[i, index, :]
         hidden_states=hidden_states_clone
         return hidden_states
 class RelativeCoordPredictor(nn.Module):
@@ -301,68 +305,13 @@ class RelativeCoordPredictor(nn.Module):
         # 得到图片的 N(Batch_Size),C,H,W
         # H=28
         N, C, S = x.shape
-        H=math.ceil(math.sqrt(S))
-        x=x.view(N,C,H,H)
-        # 计算掩码mask
-        # 得到形状为(N,H*W)的mask,表示每个像素上的通道数量
-        mask = torch.sum(x, dim=1)
-        mask = mask.view(N, S)
-        # 计算掩码阈值,计算所有像素的平均通道数,得到thresholds的形状为(N,1)
-        thresholds = torch.mean(mask, dim=1, keepdim=True)
-        # 将掩码阈值与掩码进行比较,生成一个二进制掩码二维张量binary_mask
-        # 其中元素值为0或1，表示是否超过阈值,形状为(N,H*W)
-        binary_mask = (mask > thresholds).float()
-        # 将binary_mask调整为(N, H, W)的形状
-        binary_mask = binary_mask.view(N, H, H)
-        # 将输入张量x与二进制掩码张量binary_mask相乘，
-        # 得到一个掩码后的张量masked_x，形状为(N, C, H*W)
-        masked_x = x * binary_mask.view(N, 1, H, H)
-        # 将masked_x进行维度转置操作，形状变为(N, H*W, C) H*W=S
-        masked_x = masked_x.view(N, C, H * H).transpose(1, 2).contiguous()  # (N, S, C)
+        structure_info = x.view(N, C, S).transpose(1, 2).contiguous()  # (N, S, C)
         # torch.mean(masked_x, dim=-1) 将C维平均得到 (N, H*W)
         # 再对其进行取最大值,得到具有最大值像素的索引即reduced_x_max_index
         # reduced_x_max_index形状为(N)
-        _, reduced_x_max_index = torch.max(torch.mean(masked_x, dim=-1), dim=-1)
-        # 构建一个基础索引张量basic_index，其元素值为0到N-1的整数,并将其移动到GPU上
-        basic_index = torch.from_numpy(np.array([i for i in range(N)])).cuda().long()
-        # 生成一个形状为(size,size,2)的张量 size=H,(H,H,2)
-        basic_label = torch.from_numpy(self.build_basic_label(H)).float()
-        # Build Label
-        label = basic_label.cuda()
-        # 通过扩展操作得到与masked_x形状相匹配的张量形状(N, H, W, 2)
-        # 将其转换为张量形状(N, H*W, 2)
-        label = label.unsqueeze(0).expand((N, H, H, 2)).view(N, S, 2)  # (N, S, 2)
-        basic_anchor = label[basic_index, reduced_x_max_index, :].unsqueeze(1)  # (N, 1, 2)
-        # 计算相对坐标，label - basic_anchor并再除以size
-        # 即当前样本的每个像素相对于锚点像素的相对坐标，并再除以size(N,S,2)
-        relative_coord = label - basic_anchor
-        relative_coord = relative_coord / H
-        # 计算相对距离，通过对相对坐标的每个分量进行平方和再开方得到，(N, S)
-        relative_dist = torch.sqrt(torch.sum(relative_coord ** 2, dim=-1))  # (N, S)
-        # 计算相对角度，通过调用torch.atan2函数计算相对坐标的反正切值，得到角度值范围在(-pi, pi)，(N, S)
-        relative_angle = torch.atan2(relative_coord[:, :, 1], relative_coord[:, :, 0])  # (N, S) in (-pi, pi)
-        # 将相对角度的值转换到0到1的范围内，通过将角度值除以np.pi，加1，再除以2
-        relative_angle = (relative_angle / np.pi + 1) / 2  # (N, S) in (0, 1)
-        # 调整掩码的形状与相对距离和相对角度匹配(N, H*W)
-        binary_relative_mask = binary_mask.view(N, S).cuda()
-        # 将相对距离和相对角度乘以掩码，将非掩码的位置置零
-        # relative_dist = relative_dist * binary_relative_mask
-        # relative_angle = relative_angle * binary_relative_mask
-        # 调整基本锚点的形状(N, 2)
-        basic_anchor = basic_anchor.squeeze(1)  # (N, 2)
-        relative_coord_total = torch.cat((relative_dist.unsqueeze(2), relative_angle.unsqueeze(2)), dim=-1)
-        weight = x.view(N,C,S).transpose(1, 2).contiguous()
-        position_weight = torch.mean(weight, dim=-1)
-        position_weight = position_weight.unsqueeze(2)
-        # position_weight = torch.mean(masked_x, dim=-1)
-        # position_weight = position_weight.unsqueeze(2)
-        # 是否可以换成不进行掩码的x进行平均,得到每个patch的多头权重平均值
-        position_weight = torch.matmul(position_weight, position_weight.transpose(1, 2))
-        # 返回
-        # 相对坐标总和(N,S,2)
-        # 锚点(N,2)
-        # 位置权重 (N, H*W,H*W) (N, S,S)
-        return relative_coord_total, basic_anchor,position_weight
+        _, reduced_x_max_index = torch.max(torch.mean(structure_info, dim=-1), dim=-1)
+
+        return structure_info, reduced_x_max_index
     # 得到每个patch的坐标信息
     def build_basic_label(self, size):
         basic_label = np.array([[(i, j) for j in range(size)] for i in range(size)])
@@ -459,12 +408,12 @@ if __name__ == '__main__':
     # print(x[:, :, 0, :].shape)
     # y=torch.max(x[:, :, 0, :], dim=2, keepdim=False)[0]
     # print(y.shape)
-    # y = net(x)
+    y = net(x)
     # print(y.keys())
-    for name, param in net.state_dict().items():
-        print(name)
-    pretrained_weights = np.load('ViT-B_16.npz')
-    net.load_from(pretrained_weights)
+    # for name, param in net.state_dict().items():
+    #     print(name)
+    # pretrained_weights = np.load('ViT-B_16.npz')
+    # net.load_from(pretrained_weights)
 
     # for name, param in pretrained_weights.items():
     #     print(name)
