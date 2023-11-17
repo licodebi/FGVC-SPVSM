@@ -240,7 +240,8 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
                     loss_pi+=args.lambda_a*loss_ao
                 elif "comb_outs" in name:
                     loss_co=nn.CrossEntropyLoss()(outs[name],labels)
-                    loss_pi+=(1-args.lambda_a)*loss_co
+                    # loss_pi+=(1-args.lambda_a)*loss_co
+                    loss_pi+=4.0*loss_co
 
                 # 如果使用了选择器
                 # elif "select_" in name:

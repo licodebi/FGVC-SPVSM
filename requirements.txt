@@ -11,6 +11,5 @@ scikit-learn==1.3.0
 protobuf==3.19.0
 ml-collections==0.1.1
 scikit-image==0.21.0
-ml-collections==0.1.1
 easydict==1.11
 kornia==0.7.0
