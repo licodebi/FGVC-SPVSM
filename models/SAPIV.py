@@ -142,28 +142,27 @@ class SAPEncoder(nn.Module):
             #     hidden_states=self.part_structure(hidden_states,attention_map)
             #     # select_hidden_states,select_weights=self.stru_atten(hidden_states)
             #     class_token_list.append(self.part_norm(hidden_states[:,0]))
-        cls_token=hidden_states[:, 0].unsqueeze(1)
-        clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
-        stru_states, stru_weights,_=self.part_layer(hidden_states)
+            # cls_token=hidden_states[:, 0].unsqueeze(1)
+            # clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
+        stru_states, stru_weights, _ = self.part_layer(hidden_states)
         # _,attention_map=self.part_attention(stru_weights)
-        stru_weights=stru_weights[:,:,0,1:]
-        stru_states= self.part_structure(stru_states,stru_weights)
-        # cls_token=stru_states[:,0].unsqueeze(1)
-        class_token_list.append(self.part_norm(stru_states)[:,0])
+        stru_weights = stru_weights[:, :, 0, 1:]
+        stru_states = self.part_structure(stru_states, stru_weights)
+        cls_token = stru_states[:, 0].unsqueeze(1)
+        class_token_list.append(self.part_norm(stru_states)[:, 0])
         # select_hidden_states, select_weights = self.stru_atten(part_states)
         # clr,weights=self.clr_encoder(selected_hidden_list,cls_token)
-        # clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
-        # clr, weights,contribution= self.clr_encoder(selected_hidden_list, last_token)
-        sort_idx,_,_ = self.patch_select(clr,weights,contribution, last=True)
-        if not test_mode and self.count >= self.warm_steps:
-            layer_count=self.count_patch(sort_idx)
-            self.update_layer_select(layer_count)
-        out=clr[torch.arange(B).unsqueeze(1),sort_idx]
+        clr, weights, contribution = self.clr_encoder(selected_hidden_list, cls_token)
+        sort_idx, _, _ = self.patch_select(clr, weights, contribution, last=True)
+        # if not test_mode and self.count >= self.warm_steps:
+        #     layer_count=self.count_patch(sort_idx)
+        #     self.update_layer_select(layer_count)
+        out = clr[torch.arange(B).unsqueeze(1), sort_idx]
         out = torch.cat((cls_token, out), dim=1)
-        out,_,_ = self.key_layer(out)
+        out, _, _ = self.key_layer(out)
         key = self.key_norm(out)
-        class_token_list=class_token_list[-4:]
-        return key[:, 0], clr[:, 0],class_token_list
+        class_token_list = class_token_list[-4:]
+        return key[:, 0], clr[:, 0], class_token_list
     def count_patch(self, sort_idx):
         # layer_count 将输出 [16, 30, 42, 52, 60, 66, 74, 84, 96, 110, 126]
         # 表示上层的选择数加本层的选择数
