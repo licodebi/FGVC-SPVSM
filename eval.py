@@ -36,12 +36,12 @@ def cal_train_metrics(args, msg: dict, outs: dict, labels: torch.Tensor, batch_s
             msg["train_acc/struct_outs_acc"] = acc
             loss_so = nn.CrossEntropyLoss()(outs[name], labels)
             msg["train_loss/struct_outs_loss"] = loss_so
-            loss_si += loss_so
+            loss_si += args.lambda_c * loss_so
 
         elif "last_token" in name:
             loss_co = con_loss_new(outs[name], labels)
             msg["train_loss/last_token_loss"] = loss_co
-            loss_cl += loss_co
+            loss_cl += args.lambda_d * loss_co
         elif "assist_outs" in name:
             acc = top_k_corrects(outs[name], labels, tops=[1])["top-1"] / batch_size
             msg["train_acc/assist_outs_acc"] = acc
@@ -52,84 +52,9 @@ def cal_train_metrics(args, msg: dict, outs: dict, labels: torch.Tensor, batch_s
             acc = top_k_corrects(outs[name], labels, tops=[1])["top-1"] / batch_size
             msg["train_acc/comb_outs_acc"] = acc
             loss_co = nn.CrossEntropyLoss()(outs[name], labels)
-            msg["train_loss/comb_outs_loss"] = 4.0 * loss_co
-            # msg["train_loss/comb_outs_loss"] = loss_co
-            loss_pi += 4.0 * loss_co
-            # loss_pi += (1 - args.lambda_a) * loss_co
-    # 如果使用了fpn
-    # if args.use_fpn:
-        # for i in range(1, 4):
-        #     # 得到top-1的精确度
-        #     # acc = top_k_corrects(outs["layer"+str(i)].mean(1), labels, tops=[1])["top-1"] / batch_size
-        #     # # 将精确度转为百分比
-        #     # acc = round(acc * 100, 2)
-        #     # msg["train_acc/layer{}_acc".format(i)] = acc
-        #     # 得到训练损失中每一层的损失
-        #     loss = F.cross_entropy(outs["layer"+str(i)].mean(1), labels)
-        #     msg["train_loss/layer{}_loss".format(i)] = loss.item()
-        #     total_loss += loss.item()
-
-    # 如果使用选择器
-    # if args.use_selection:
-    #     for name in outs:
-    #         # if "select_" not in name:
-    #         #     continue
-    #         if "drop_" not in name:
-    #             continue
-    #         # 得到选择器的输出
-    #         B, S, _ = outs[name].size()
-    #         # 得到[B*S,200]
-    #         logit = outs[name].view(-1, args.num_classes)
-    #         # labels变为[B*S]
-    #         # labels_0 = labels.unsqueeze(1).repeat(1, S).flatten(0)
-    #         # acc = top_k_corrects(logit, labels_0, tops=[1])["top-1"] / (B*S)
-    #         # acc = round(acc * 100, 2)
-    #         # # 计算得到选择器精确度
-    #         # msg["train_acc/{}_acc".format(name)] = acc
-    #         labels_0 = torch.zeros([B * S, args.num_classes]) - 1
-    #         labels_0 = labels_0.to(args.device)
-    #         loss = F.mse_loss(F.tanh(logit), labels_0)
-    #         # 计算损失
-    #         msg["train_loss/{}_loss".format(name)] = loss.item()
-    #         total_loss += loss.item()
-    #
-    #     for name in outs:
-    #         # if "drop_" not in name:
-    #         #     continue
-    #         if "select_" not in name:
-    #             continue
-    #         B, S, _ = outs[name].size()
-    #         logit = outs[name].view(-1, args.num_classes)
-    #         labels_1 = labels.unsqueeze(1).repeat(1, S).flatten(0)
-    #         # acc = top_k_corrects(logit, labels_1, tops=[1])["top-1"] / (B*S)
-    #         # acc = round(acc * 100, 2)
-    #         # # 计算得到被丢弃的映射精确度
-    #         # msg["train_acc/{}_acc".format(name)] = acc
-    #         loss = F.cross_entropy(logit, labels_1)
-    #         # 计算得到被丢弃的映射的损失，即论文中的loss_d
-    #         msg["train_loss/{}_loss".format(name)] = loss.item()
-    #         total_loss += loss.item()
-
-    # contrast_loss = con_loss_new(outs[name], labels.view(-1))
-    # msg["train_loss/contrast_loss"]=contrast_loss
-    # if args.use_combiner:
-    #     # 计算得到结合器输出精确度以及对应的损失
-    #     acc = top_k_corrects(outs['comb_outs'], labels, tops=[1])["top-1"] / batch_size
-    #     acc = round(acc * 100, 2)
-    #     msg["train_acc/combiner_acc"] = acc
-    #     loss = F.cross_entropy(outs['comb_outs'], labels)
-    #     # 论文中的loss_m
-    #     msg["train_loss/combiner_loss"] = loss.item()
-    #     total_loss += loss.item()
-    #
-    # if "ori_out" in outs:
-    #     acc = top_k_corrects(outs["ori_out"], labels, tops=[1])["top-1"] / batch_size
-    #     acc = round(acc * 100, 2)
-    #     msg["train_acc/ori_acc"] = acc
-    #     loss = F.cross_entropy(outs["ori_out"], labels)
-    #     msg["train_loss/ori_loss"] = loss.item()
-    #     total_loss += loss.item()
-    total_loss = args.lambda_b * loss_si + (1 - args.lambda_b) * loss_pi+loss_cl
+            msg["train_loss/comb_outs_loss"] = loss_co
+            loss_pi += args.lambda_b * loss_co
+    total_loss = loss_si + loss_pi + loss_cl
     msg["train_loss/total_loss"] = total_loss
 
 

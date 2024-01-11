@@ -7,7 +7,6 @@ import torch.nn.functional as F
 import torch.nn as nn
 from models.modules import *
 from models.vit import get_b16_config
-
 class SPTransformer(nn.Module):
     def __init__(self,config,num_classes,img_size,update_warm,patch_num,total_num,split='non-overlap',coeff_max=0.25):
         super(SPTransformer, self).__init__()
@@ -93,14 +92,12 @@ class SAPEncoder(nn.Module):
         self.layer = nn.ModuleList()
         self.layer_num=config.num_layers
         # 前11层
-        for _ in range(config.num_layers-1):
+        for _ in range(config.num_layers):
             layer=Block(config,coeff_max)
             self.layer.append(copy.deepcopy(layer))
         self.clr_layer = Block(config,coeff_max)
         self.key_layer = Block(config,coeff_max)
-        # self.stru_atten=Block(config)
         self.part_layer=Block(config,coeff_max)
-        # self.part_layer=self.layer[-1]
 
         self.key_norm = LayerNorm(config.hidden_size, eps=1e-6)
         self.part_norm = LayerNorm(config.hidden_size, eps=1e-6)
@@ -122,6 +119,13 @@ class SAPEncoder(nn.Module):
         selected_hidden_list=[]
         class_token_list = []
         for i,layer in enumerate(self.layer):
+            if i==11:
+                stru_states, stru_weights,_=layer(hidden_states, mask)
+                attention_map=stru_weights[:,:,0,1:]
+                stru_states= self.part_structure(stru_states,attention_map,stru_weights)
+                cls_token=stru_states[:,0].unsqueeze(1)
+                class_token_list.append(self.part_norm(stru_states)[:,0])
+                break
             hidden_states,weights,contribution=layer(hidden_states, mask)
             select_num = torch.round(self.select_num[i]).int()
             select_idx, select_score,hidden_states=self.patch_select(hidden_states,weights,contribution,select_num)
@@ -142,22 +146,9 @@ class SAPEncoder(nn.Module):
             #     hidden_states=self.part_structure(hidden_states,attention_map)
             #     # select_hidden_states,select_weights=self.stru_atten(hidden_states)
             #     class_token_list.append(self.part_norm(hidden_states[:,0]))
-        cls_token=hidden_states[:, 0].unsqueeze(1)
         clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
-        stru_states, stru_weights,_=self.part_layer(hidden_states)
-        # _,attention_map=self.part_attention(stru_weights)
-        attention_map=stru_weights[:,:,0,1:]
-        stru_states= self.part_structure(stru_states,attention_map,stru_weights)
-        # cls_token=stru_states[:,0].unsqueeze(1)
-        class_token_list.append(self.part_norm(stru_states)[:,0])
-        # select_hidden_states, select_weights = self.stru_atten(part_states)
-        # clr,weights=self.clr_encoder(selected_hidden_list,cls_token)
-        # clr, weights,contribution= self.clr_encoder(selected_hidden_list, cls_token)
-        # clr, weights,contribution= self.clr_encoder(selected_hidden_list, last_token)
         sort_idx,_,_ = self.patch_select(clr,weights,contribution, last=True)
-        if not test_mode and self.count >= self.warm_steps:
-            layer_count=self.count_patch(sort_idx)
-            self.update_layer_select(layer_count)
+
         out=clr[torch.arange(B).unsqueeze(1),sort_idx]
         out = torch.cat((cls_token, out), dim=1)
         out,_,_ = self.key_layer(out)
@@ -222,6 +213,7 @@ class MultiHeadSelector(nn.Module):
             for i in range(B):
                 index = int(basic_index[i])
                 hidden_states_clone[i, 0] = hidden_states_clone[i, 0] + structure_info[i, index, :]
+                hidden_states_clone[i, 1:] = hidden_states_clone[i, 1:] + structure_info[i, :, :]
             hidden_states = hidden_states_clone
 
         # 判别区域选择
@@ -295,6 +287,7 @@ class Part_Structure(nn.Module):
         for i in range(B):
             index = int(basic_index[i])
             hidden_states_clone[i, 0] = hidden_states_clone[i, 0] + structure_info[i, index, :]
+            hidden_states_clone[i, 1:] = hidden_states_clone[i, 1:] + structure_info[i, :, :]
         hidden_states=hidden_states_clone
         return hidden_states
 class RelativeCoordPredictor(nn.Module):

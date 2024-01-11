@@ -1,16 +1,16 @@
-project_name: FGVC-EX-SOD
+project_name: FGVC-paper-dog
 notes: 'no inverse'
-exp_name: spvsmv1-nonoverlap
+exp_name: paper-dog
 use_wandb: True
 wandb_entity: libicheng
 train_root: ./CUB200-2011/train/
 val_root: ./CUB200-2011/test/
-data_root: ./CUB200-2011/
+data_root: ./dogs/
 isU2net: True
 coeff_max: 0.3
 #"CUB", "dogs", "nabirds"
-dataset: CUB
-img_size: 448
+dataset: dogs
+img_size: 400
 num_workers: 2
 batch_size: 16
 model_name: vit-b_16
@@ -19,7 +19,7 @@ pretrained: ~
 optimizer: SGD
 max_lr: 0.00049
 wdecay: 0.0003
-max_epochs: 80
+max_epochs: 250
 warmup_batchs: 1500
 use_amp: True
 isSOD: True
@@ -39,9 +39,10 @@ use_combiner: True
 #lambda_b: 0.3
 #lambda_s: 0.0
 #lambda_n: 5.0
-#lambda_c: 1.0
-lambda_b: 0.5
 lambda_a: 0.2
+lambda_b: 1.0
+lambda_c: 0.5
+lambda_d: 1.0
 update_freq: 2
 log_freq: 100
 eval_freq: 2

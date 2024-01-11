@@ -216,88 +216,28 @@ def train(args, epoch, model, scaler, amp_context, optimizer, schedule, train_lo
                 outs = model(datas,False,masks)
             else:
                 outs = model(datas)
-
             loss_pi = 0.
             loss_si = 0.
             loss_cl=0.
             loss= 0.
             for name in outs:
                 if "struct_outs" in name:
-                    loss_so=nn.CrossEntropyLoss()(outs[name],labels)
-                    loss_si+=loss_so
-                # 如果时上采样的结果
-                # if "layer" in name:
-                #     if args.lambda_b0 != 0:
-                #         loss_b0 = nn.CrossEntropyLoss()(outs[name].mean(1), labels)
-                #         loss += args.lambda_b0 * loss_b0
-                #     else:
-                #         loss_b0 = 0.0
+                    loss_so = nn.CrossEntropyLoss()(outs[name], labels)
+                    loss_si += args.lambda_c * loss_so
                 elif "last_token" in name:
                     loss_co = con_loss_new(outs[name], labels)
-                    loss_cl+=loss_co
+                    loss_cl += args.lambda_d * loss_co
                 elif "assist_outs" in name:
-                    loss_ao=nn.CrossEntropyLoss()(outs[name],labels)
-                    loss_pi+=args.lambda_a*loss_ao
+                    loss_ao = nn.CrossEntropyLoss()(outs[name], labels)
+                    loss_pi += args.lambda_a * loss_ao
                 elif "comb_outs" in name:
-                    loss_co=nn.CrossEntropyLoss()(outs[name],labels)
-                    loss_pi+=4.0*loss_co
-
-                # 如果使用了选择器
-                # elif "select_" in name:
-                #     if not args.use_selection:
-                #         raise ValueError("Selector not use here.")
-                #     if args.lambda_s != 0:
-                #         # 得到每个选择器的输出通道
-                #         # outs[name]为([B, 32, 200])
-                #         # S=32
-                #         S = outs[name].size(1)
-                #         #logit大小变为[B*32,200]
-                #         logit = outs[name].view(-1, args.num_classes).contiguous()
-                #         # labels.unsqueeze(1).repeat(1, S).flatten(0).shape
-                #         # lables变为（B*32）
-                #         loss_s = nn.CrossEntropyLoss()(logit,
-                #                                        labels.unsqueeze(1).repeat(1, S).flatten(0))
-                #         loss += args.lambda_s * loss_s
-                #     else:
-                #         loss_s = 0.0
-                # # BS模块中被丢弃的映射
-                # # 如果为被丢弃的映射
-                # elif "drop_" in name:
-                #     if not args.use_selection:
-                #         raise ValueError("Selector not use here.")
-                #
-                #     if args.lambda_n != 0:
-                #         # 得到被丢弃数
-                #         S = outs[name].size(1)
-                #         # 112为被丢弃的样本数
-                #         # logit大小变为torch.Size([B*112, 200])
-                #         logit = outs[name].view(-1, args.num_classes).contiguous()
-                #         n_preds = nn.Tanh()(logit)
-                #         # 创建一个大小与logit一样的全为-1的张量
-                #         labels_0 = torch.zeros([batch_size * S, args.num_classes]) - 1
-                #         labels_0 = labels_0.to(args.device)
-                #         # 计算两者的均方误差
-                #         # 让被抑制的背景更加接近-1
-                #         loss_n = nn.MSELoss()(n_preds, labels_0)
-                #         # 论文中的loss_d
-                #         loss += args.lambda_n * loss_n
-                #     else:
-                #         loss_n = 0.0
-                # 合并分类预测损失
-                # elif "comb_outs" in name:
-                #     if not args.use_combiner:
-                #         raise ValueError("Combiner not use here.")
-                #
-                #     if args.lambda_c != 0:
-                #         # 将合并后的分类进行损失计算
-                #         # comb_outs=[B,200]
-                #         loss_c = nn.CrossEntropyLoss()(outs[name], labels)
-                #         # 论文中的loss_m
-                #         loss += args.lambda_c * loss_c
+                    loss_co = nn.CrossEntropyLoss()(outs[name], labels)
+                    # loss_pi+=4.0*loss_co
+                    loss_pi += args.lambda_b * loss_co
                 elif "ori_out" in name:
                     loss_ori = F.cross_entropy(outs[name], labels)
                     loss += loss_ori
-            loss = args.lambda_b * loss_si + (1 - args.lambda_b) * loss_pi+loss_cl
+            loss = loss_si+loss_pi+loss_cl
             # 当前批次不是最后 n_left_batchs 个未处理的批次
             if batch_id < len(train_loader) - n_left_batchs:
                 loss /= args.update_freq
@@ -405,10 +345,10 @@ def main(args, tlogger):
                 checkpoint = {"model": model_to_save.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch,
                               "best_acc": best_acc}
                 torch.save(checkpoint, args.save_dir + "backup/best.pt")
-            if args.use_wandb:
-                wandb.run.summary["best_acc"] = best_acc
-                wandb.run.summary["best_eval_name"] = best_eval_name
-                wandb.run.summary["best_epoch"] = epoch + 1
+                if args.use_wandb:
+                    wandb.run.summary["best_acc"] = best_acc
+                    wandb.run.summary["best_eval_name"] = best_eval_name
+                    wandb.run.summary["best_epoch"] = epoch + 1
 
 
 if __name__ == "__main__":
